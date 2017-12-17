@@ -47,7 +47,6 @@ class Window(QMainWindow):
         super(Window, self).__init__(None)
         self.__data_context = WindowViewModel()
         self.__data_context.property_changed.connect(self.__on_data_context_property_changed)
-        self.__data_context_meta = self.__data_context.metaObject()
         self.__bindings = {}
 
     def setup_ui(self):
