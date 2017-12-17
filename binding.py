@@ -4,13 +4,21 @@ from pyside import *
 
 class Binding(object):
 
+    MODE_ONEWAY = 0
+    MODE_TWOWAY = 1
+    MODE_ONEWAYTOSOURCE = 2
+
+    @property
+    def mode(self): return self.__mode
+
     @property
     def setter(self): return self.__setter
 
     @property
     def getter(self): return self.__getter
 
-    def __init__(self, setter, getter):
+    def __init__(self, mode, setter, getter):
+        self.__mode = mode
         self.__setter = setter
         self.__getter = getter
 
@@ -33,24 +41,46 @@ class BoundPropertyUpdater(object):
         self.__data_context = None
         self.__bindings = {}
 
-    def add_binding(self, name, setter, getter, on_changed=None):
-        self.__bindings[name] = Binding(setter, getter)
-        if on_changed is not None:
-            on_changed.connect(lambda: self.__on_property_changed(name))
+    def add_one_way(self, name, setter):
+        """
+        ViewModel -> View
+        """
+        self.__bindings[name] = Binding(Binding.MODE_ONEWAY, setter, None)
+
+    def add_two_way(self, name, setter, getter, on_changed):
+        """
+        ViewModel <-> View
+        """
+        self.__bindings[name] = Binding(Binding.MODE_TWOWAY, setter, getter)
+        on_changed.connect(lambda: self.__on_property_changed(name))
+
+    def add_one_way_to_source(self, name, getter, on_changed):
+        """
+        ViewModel <- View
+        """
+        self.__bindings[name] = Binding(Binding.MODE_ONEWAYTOSOURCE, None, getter)
+        on_changed.connect(lambda: self.__on_property_changed(name))
 
     def __on_data_context_property_changed(self, sender, e):
         if e.name not in self.__bindings:
             return
-        self.__bindings[e.name].setter(e.value)
+
+        binding = self.__bindings[e.name]
+        if binding.mode == Binding.MODE_ONEWAYTOSOURCE:
+            return
+
+        binding.setter(e.value)
 
     def __on_property_changed(self, name):
         if name not in self.__bindings:
             return
 
-        if name not in type(self.__data_context).__dict__:
+        binding = self.__bindings[name]
+        if binding.mode == Binding.MODE_ONEWAY:
             return
 
-        value = self.__bindings[name].getter()
+        if name not in self.__data_context.__dict__:
+            return
 
-        prop = type(self.__data_context).__dict__[name]
-        prop.__set__(self.__data_context, value)
+        prop = self.__data_context.__dict__[name]
+        prop.value = binding.getter()

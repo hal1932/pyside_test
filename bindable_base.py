@@ -23,7 +23,7 @@ class BindableBase(QObject):
     def __init__(self, parent=None):
         super(BindableBase, self).__init__(parent)
 
-    def _set_property(self, name, value):
+    def set_property(self, name, value):
         old_value = getattr(self, name)
         if old_value == value:
             return False
@@ -33,8 +33,29 @@ class BindableBase(QObject):
         return True
 
 
-    def _on_property_changed(self, name):
-        value = getattr(self, name)
-        e = PropertyChangedEventArgs(name, value)
-        print 'property changed: {}, {}'.format(name, value)
+    def on_property_changed(self, name, new_value=None):
+        prop = getattr(self, name)
+        e = PropertyChangedEventArgs(name, prop.value)
+        print 'property changed: {}, {}'.format(name, prop.value)
         self.property_changed.emit(self, e)
+
+
+class ObservableProperty(QObject):
+
+    value_changed = Signal(object)
+
+    @property
+    def value(self): return self.__value
+
+    @value.setter
+    def value(self, new_value):
+        if new_value == self.value:
+            return
+        self.__value = new_value
+        self.parent().on_property_changed(self.__name, new_value)
+        self.value_changed.emit(new_value)
+
+    def __init__(self, name, parent):
+        super(ObservableProperty, self).__init__(parent=parent)
+        self.__name = name
+        self.__value = None
